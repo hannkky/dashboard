@@ -62,6 +62,16 @@ function VerEditarPlaneacionModal({ isOpen, onClose, planeacion, onUpdate }) {
     }
   };
 
+  const persistSpecialtyFromForm = (data) => {
+    const careerName = data?.carrera || '';
+    const specialty = data?.especialidad || '';
+    const key = careerKey(careerName);
+    if (!key || !specialty) return;
+    const current = specialtiesByCareer[key] || [];
+    if (current.some(s => s.toLowerCase() === specialty.toLowerCase())) return;
+    setSpecialtiesByCareer({ ...specialtiesByCareer, [key]: [...current, specialty] });
+  };
+
   const updateUnidad = (index, field, value) => {
     const updated = (editedData?.unidades || []).map((u, i) => i === index ? { ...u, [field]: value } : u);
     setEditedData({ ...editedData, unidades: updated });
@@ -79,6 +89,7 @@ function VerEditarPlaneacionModal({ isOpen, onClose, planeacion, onUpdate }) {
 
   const handleSave = (estado) => {
     if (onUpdate) {
+      persistSpecialtyFromForm(editedData);
       onUpdate({
         ...editedData,
         estado: estado,
@@ -108,6 +119,17 @@ function VerEditarPlaneacionModal({ isOpen, onClose, planeacion, onUpdate }) {
         </div>
 
         <div className="p-6">
+          {!isEditing && (
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-teal-500 hover:bg-teal-600 text-white font-semibold px-4 py-2 transition"
+              >
+                <span className="material-symbols-outlined text-base">edit</span>
+                {t('action_editar')}
+              </button>
+            </div>
+          )}
           <div className="mb-6 flex items-center gap-3">
             <span className="text-gray-700 font-semibold">{t('modal_estado')}:</span>
             <span
@@ -139,22 +161,6 @@ function VerEditarPlaneacionModal({ isOpen, onClose, planeacion, onUpdate }) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-700 font-semibold mb-1">{t('turno')}</label>
-                {isEditing ? (
-                  <select
-                    value={editedData.turno || ''}
-                    onChange={(e) => handleDataChange('turno', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500"
-                  >
-                    <option value="">{t('turno_select')}</option>
-                    <option value="Matutino">{t('turno_m')}</option>
-                    <option value="Vespertino">{t('turno_v')}</option>
-                  </select>
-                ) : (
-                  <p className="bg-gray-50 px-4 py-2 rounded-lg text-gray-700">{editedData.turno || '-'}</p>
-                )}
-              </div>
               <div>
                 <label className="block text-gray-700 font-semibold mb-1">{t('fecha_elaboracion')}</label>
                 {isEditing ? (
@@ -271,6 +277,20 @@ function VerEditarPlaneacionModal({ isOpen, onClose, planeacion, onUpdate }) {
                 />
               ) : (
                 <p className="bg-gray-50 px-4 py-2 rounded-lg text-gray-700">{editedData.materia || editedData.nombMateria}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-gray-700 font-semibold mb-1">{t('cuatrimestre')}</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editedData.cuatrimestre || ''}
+                  onChange={(e) => handleDataChange('cuatrimestre', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500"
+                />
+              ) : (
+                <p className="bg-gray-50 px-4 py-2 rounded-lg text-gray-700">{editedData.cuatrimestre || '-'}</p>
               )}
             </div>
 
@@ -426,15 +446,6 @@ function VerEditarPlaneacionModal({ isOpen, onClose, planeacion, onUpdate }) {
               </>
             ) : (
               <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg transition"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <span className="material-symbols-outlined text-base">edit</span>
-                    {t('action_editar')}
-                  </span>
-                </button>
                 {editedData.estado === 'Borrador' && (
                   <button
                     onClick={() => handleSave('Completado')}

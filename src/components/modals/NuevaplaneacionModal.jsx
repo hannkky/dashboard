@@ -3,6 +3,7 @@ import mammoth from 'mammoth';
 import { useEffect, useState } from 'react';
 import { t } from '../../i18n';
 import Popup from '../ui/Popup';
+import { specialtiesService } from '../../services/api';
 
 // Configurar worker del PDF.js usando archivo de public
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
@@ -16,6 +17,10 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [specialtiesByCareer, setSpecialtiesByCareer] = useState({});
   const [newSpecialty, setNewSpecialty] = useState('');
+  const [formPopup, setFormPopup] = useState({ open: false, title: '', message: '' });
+
+  const openFormPopup = (title, message) => setFormPopup({ open: true, title, message });
+  const closeFormPopup = () => setFormPopup((prev) => ({ ...prev, open: false }));
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -26,22 +31,39 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
       setExtractedData(null);
       setShowPreview(false);
     } else {
-      alert('Por favor selecciona un archivo PDF o Word válido');
+      openFormPopup('Archivo inválido', 'Selecciona un archivo PDF o Word válido.');
     }
   };
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('especialidadesPorCarrera');
-      if (raw) setSpecialtiesByCareer(JSON.parse(raw));
-    } catch (e) {}
+    let mounted = true;
+    const loadSpecialties = async () => {
+      try {
+        const res = await specialtiesService.getAll();
+        if (mounted && res?.data) {
+          setSpecialtiesByCareer(res.data);
+          try { localStorage.setItem('especialidadesPorCarrera', JSON.stringify(res.data)); } catch (e) {}
+          return;
+        }
+      } catch (e) {}
+      try {
+        const raw = localStorage.getItem('especialidadesPorCarrera');
+        if (mounted && raw) setSpecialtiesByCareer(JSON.parse(raw));
+      } catch (e) {}
+    };
+    loadSpecialties();
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     try { localStorage.setItem('especialidadesPorCarrera', JSON.stringify(specialtiesByCareer)); } catch (e) {}
   }, [specialtiesByCareer]);
 
-  const careerKey = (value) => (value || '').trim().toLowerCase();
+  const careerKey = (value) => (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
   const getSpecialtiesForCareer = (careerName) => {
     const key = careerKey(careerName);
@@ -59,6 +81,9 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
     setSpecialtiesByCareer(updated);
     setEditedData({ ...editedData, especialidad: nextValue });
     setNewSpecialty('');
+    specialtiesService.add(careerName, nextValue).then((res) => {
+      if (res?.data) setSpecialtiesByCareer(res.data);
+    }).catch(() => {});
   };
 
   const removeSpecialtyForCareer = (value) => {
@@ -72,6 +97,33 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
     if (editedData?.especialidad === value) {
       setEditedData({ ...editedData, especialidad: next[0] || '' });
     }
+    specialtiesService.remove(careerName, value).then((res) => {
+      if (res?.data) setSpecialtiesByCareer(res.data);
+    }).catch(() => {});
+  };
+
+  const persistSpecialtyFromForm = (data) => {
+    const careerName = data?.carrera || '';
+    const specialty = data?.especialidad || '';
+    const key = careerKey(careerName);
+    if (!key || !specialty) return;
+    const current = specialtiesByCareer[key] || [];
+    if (current.some(s => s.toLowerCase() === specialty.toLowerCase())) return;
+    setSpecialtiesByCareer({ ...specialtiesByCareer, [key]: [...current, specialty] });
+    specialtiesService.add(careerName, specialty).then((res) => {
+      if (res?.data) setSpecialtiesByCareer(res.data);
+    }).catch(() => {});
+  };
+
+  const normalizeDateRange = (value) => {
+    if (!value) return '';
+    return value.replace(/\s*-\s*/g, ' al ').replace(/\s*al\s*/gi, ' al ').trim();
+  };
+
+  const isValidDateRange = (value) => {
+    if (!value) return false;
+    const normalized = normalizeDateRange(value);
+    return /^\d{1,2}\/\d{1,2}\/\d{4}\s+al\s+\d{1,2}\/\d{1,2}\/\d{4}$/.test(normalized);
   };
 
   useEffect(() => {
@@ -719,6 +771,7 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
           nombMateria: extractMateria(cleanText, page1Lines),
           fechaInicio: dates.fechaInicio,
           fechaFin: dates.fechaFin,
+          cuatrimestre: extractPeriodoEscolar(cleanText, page1Lines),
           periodoEscolar: extractPeriodoEscolar(cleanText, page1Lines),
           docente: extractDocente(cleanText, page1Lines),
           horasTotales: extractField(cleanText, [
@@ -742,7 +795,7 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
       } catch (error) {
         console.error('Error extrayendo documento:', error);
         const detail = error?.message ? ` Detalle: ${error.message}` : '';
-        alert(`Error al procesar el archivo. Verifica que el PDF no esté protegido ni dañado.${detail}`);
+        openFormPopup('Error al procesar', `Verifica que el archivo no esté protegido ni dañado.${detail}`);
       } finally {
         setIsExtracting(false);
       }
@@ -773,9 +826,61 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
 
   const handleSave = (estado) => {
     if (editedData) {
+      if (estado !== 'Borrador') {
+        const requiredFields = [
+          { key: 'carrera', label: t('modal_carrera') },
+          { key: 'especialidad', label: t('modal_especialidad') },
+          { key: 'grado', label: t('modal_grado') },
+          { key: 'grupo', label: t('modal_grupo') },
+          { key: 'nombMateria', label: t('modal_materia') },
+          { key: 'cuatrimestre', label: t('cuatrimestre') },
+          { key: 'horasTotales', label: t('modal_horas') },
+          { key: 'docente', label: t('modal_docente') },
+          { key: 'fechaElaboracion', label: t('fecha_elaboracion') },
+        ];
+        const missing = requiredFields
+          .filter(item => !String(editedData[item.key] || '').trim())
+          .map(item => `• ${item.label}`);
+
+        const unitIssues = [];
+        (editedData.unidades || []).forEach((u, idx) => {
+          const prefix = `• Unidad ${idx + 1}`;
+          if (!String(u.titulo || '').trim()) unitIssues.push(`${prefix}: sin título`);
+          if (!String(u.fechaPlaneada || '').trim()) unitIssues.push(`${prefix}: falta fecha planeada`);
+          if (!String(u.fechaReal || '').trim()) unitIssues.push(`${prefix}: falta fecha real`);
+          if (!String(u.fechaEvalPlaneada || '').trim()) unitIssues.push(`${prefix}: falta fecha evaluación planeada`);
+          if (!String(u.fechaEvalReal || '').trim()) unitIssues.push(`${prefix}: falta fecha evaluación real`);
+          if (u.fechaPlaneada && !isValidDateRange(u.fechaPlaneada)) unitIssues.push(`${prefix}: fecha planeada inválida`);
+          if (u.fechaReal && !isValidDateRange(u.fechaReal)) unitIssues.push(`${prefix}: fecha real inválida`);
+          if (u.fechaEvalPlaneada && !isValidDateRange(u.fechaEvalPlaneada)) unitIssues.push(`${prefix}: fecha evaluación planeada inválida`);
+          if (u.fechaEvalReal && !isValidDateRange(u.fechaEvalReal)) unitIssues.push(`${prefix}: fecha evaluación real inválida`);
+        });
+
+        if (missing.length > 0 || unitIssues.length > 0) {
+          const message = [
+            missing.length ? 'Campos obligatorios:' : '',
+            ...missing,
+            unitIssues.length ? '\nUnidades:' : '',
+            ...unitIssues
+          ].filter(Boolean).join('\n');
+          openFormPopup('Revisa la información', message);
+          return;
+        }
+      }
+
+      const normalizedUnits = (editedData.unidades || []).map(u => ({
+        ...u,
+        fechaPlaneada: normalizeDateRange(u.fechaPlaneada || ''),
+        fechaReal: normalizeDateRange(u.fechaReal || ''),
+        fechaEvalPlaneada: normalizeDateRange(u.fechaEvalPlaneada || ''),
+        fechaEvalReal: normalizeDateRange(u.fechaEvalReal || ''),
+      }));
+
+      persistSpecialtyFromForm(editedData);
       const periodo = editedData.grado || '1';
       onSave({
         ...editedData,
+        unidades: normalizedUnits,
         id: Date.now(),
         periodo: `2025-${periodo}`,
         estado: estado,
@@ -804,7 +909,13 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
         <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-4 flex justify-between items-center">
           <h2 className="text-white text-xl font-bold">{t('modal_new_title')}</h2>
           <button
-            onClick={() => setShowExitConfirm(true)}
+            onClick={() => {
+              if (!showPreview) {
+                resetModal();
+                return;
+              }
+              setShowExitConfirm(true);
+            }}
             className="text-white text-2xl hover:text-gray-200 transition"
           >
             ×
@@ -829,7 +940,7 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
                     if (droppedFile && (isPdf || isDocx)) {
                       setFile(droppedFile);
                     } else {
-                      alert('Por favor arrastra un archivo PDF o Word válido');
+                      openFormPopup('Archivo inválido', 'Por favor arrastra un archivo PDF o Word válido.');
                     }
                   }}
                 >
@@ -973,6 +1084,16 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
                 </div>
 
                 <div>
+                  <label className="block text-gray-700 font-semibold mb-1">{t('cuatrimestre')}</label>
+                  <input
+                    type="text"
+                    value={editedData?.cuatrimestre || ''}
+                    onChange={(e) => handleDataChange('cuatrimestre', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-gray-700 font-semibold mb-1">{t('modal_horas')}</label>
                   <input
                     type="text"
@@ -993,18 +1114,6 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-1">{t('turno')}</label>
-                    <select
-                      value={editedData?.turno || ''}
-                      onChange={(e) => handleDataChange('turno', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500"
-                    >
-                      <option value="">{t('turno_select')}</option>
-                      <option value="Matutino">{t('turno_m')}</option>
-                      <option value="Vespertino">{t('turno_v')}</option>
-                    </select>
-                  </div>
                   <div>
                     <label className="block text-gray-700 font-semibold mb-1">{t('fecha_elaboracion')}</label>
                     <input
@@ -1133,6 +1242,13 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
               className: 'px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50'
             }
           ]}
+        />
+        <Popup
+          open={formPopup.open}
+          title={formPopup.title}
+          message={formPopup.message}
+          onConfirm={closeFormPopup}
+          onCancel={closeFormPopup}
         />
       </div>
     </div>

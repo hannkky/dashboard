@@ -3,6 +3,7 @@ import express from 'express';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import planningRoutes from './routes/planning.js';
+import specialtiesRoutes from './routes/specialties.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -21,6 +22,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/planning', planningRoutes);
+app.use('/api/specialties', specialtiesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

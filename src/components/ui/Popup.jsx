@@ -10,7 +10,7 @@ function Popup({ open, title, message, variant = 'info', confirmText, cancelText
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-            {message && <p className="text-sm text-gray-600 mt-1">{message}</p>}
+            {message && <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">{message}</p>}
           </div>
           <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">×</button>
         </div>

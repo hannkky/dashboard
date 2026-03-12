@@ -4,7 +4,7 @@ import VerEditarPlaneacionModal from '../modals/VerEditarPlaneacionModal';
 import { t } from '../../i18n';
 import Popup from '../ui/Popup';
 
-function HistorialPage() {
+function HistorialPage({ onPageChange }) {
   const initialPlanes = () => {
     try {
       const raw = localStorage.getItem('planeaciones');
@@ -86,14 +86,23 @@ function HistorialPage() {
       });
   }, [planeaciones, searchTerm, showArchived, statusFilter]);
 
+  const normalizeKey = (value) => (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const displayKey = (value, fallback) => (value || '').trim() || fallback;
+
   const groupedByCarreraEspecialidad = useMemo(() => {
     const grouped = {};
     filteredPlaneaciones.forEach(plan => {
-      const carrera = plan.carrera || 'Sin carrera';
-      const especialidad = plan.especialidad || 'Sin especialidad';
-      if (!grouped[carrera]) grouped[carrera] = {};
-      if (!grouped[carrera][especialidad]) grouped[carrera][especialidad] = [];
-      grouped[carrera][especialidad].push(plan);
+      const carreraKey = normalizeKey(plan.carrera);
+      const carreraLabel = displayKey(plan.carrera, 'Sin carrera');
+      const especialidadKey = normalizeKey(plan.especialidad);
+      const especialidadLabel = displayKey(plan.especialidad, 'Sin especialidad');
+      if (!grouped[carreraKey]) grouped[carreraKey] = { label: carreraLabel, items: {} };
+      if (!grouped[carreraKey].items[especialidadKey]) grouped[carreraKey].items[especialidadKey] = { label: especialidadLabel, rows: [] };
+      grouped[carreraKey].items[especialidadKey].rows.push(plan);
     });
     return grouped;
   }, [filteredPlaneaciones]);
@@ -148,10 +157,29 @@ function HistorialPage() {
     );
   };
 
+  const handleGoToReportes = (plan) => {
+    try {
+      const payload = {
+        carrera: plan.carrera || '',
+        especialidad: plan.especialidad || '',
+        cuatrimestre: plan.cuatrimestre || plan.periodoEscolar || plan.periodo || '',
+        turno: plan.turno || '',
+        fechaElaboracion: plan.fechaElaboracion || new Date().toISOString().slice(0, 10),
+        filters: {
+          carrera: plan.carrera || '',
+          especialidad: plan.especialidad || '',
+          grupo: plan.grupo || ''
+        }
+      };
+      localStorage.setItem('reportesPrefill', JSON.stringify(payload));
+    } catch (e) {}
+    if (onPageChange) onPageChange('reportes');
+  };
+
   const statsSource = planeaciones.filter(p => (showArchived ? p.isArchived : !p.isArchived));
   const groupCount = groupBy === 'grupo'
     ? Object.keys(groupedByGrupo).length
-    : Object.values(groupedByCarreraEspecialidad).reduce((sum, specs) => sum + Object.keys(specs).length, 0);
+    : Object.values(groupedByCarreraEspecialidad).reduce((sum, data) => sum + Object.keys(data.items || {}).length, 0);
 
   return (
     <div>
@@ -278,27 +306,27 @@ function HistorialPage() {
 
       <div className="space-y-6">
         {groupBy === 'carrera' && Object.keys(groupedByCarreraEspecialidad).length > 0 ? (
-          Object.entries(groupedByCarreraEspecialidad).map(([carrera, especialidades]) => (
-            <div key={carrera} className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-3 cursor-pointer" onClick={() => setExpandedGroups(prev => ({ ...prev, [carrera]: !prev[carrera] }))}>
+          Object.entries(groupedByCarreraEspecialidad).map(([carreraKey, data]) => (
+            <div key={carreraKey} className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-3 cursor-pointer" onClick={() => setExpandedGroups(prev => ({ ...prev, [carreraKey]: !prev[carreraKey] }))}>
                 <h3 className="text-white font-bold text-lg flex items-center gap-2">
                   <span className="material-symbols-outlined text-lg">school</span>
-                  {carrera}
+                  {data.label}
                 </h3>
               </div>
 
-              {expandedGroups[carrera] && (
+              {expandedGroups[carreraKey] && (
                 <div className="p-4 space-y-4">
-                  {Object.entries(especialidades).map(([especialidad, planes]) => {
-                    const subKey = `${carrera}::${especialidad}`;
+                  {Object.entries(data.items).map(([especialidadKey, item]) => {
+                    const subKey = `${carreraKey}::${especialidadKey}`;
                     return (
                       <div key={subKey} className="border border-gray-200 rounded-lg overflow-hidden">
                         <div className="bg-gray-50 px-4 py-3 cursor-pointer flex items-center justify-between" onClick={() => setExpandedGroups(prev => ({ ...prev, [subKey]: !prev[subKey] }))}>
                           <div className="flex items-center gap-2 text-gray-800 font-semibold">
                             <span className="material-symbols-outlined text-base">category</span>
-                            {especialidad}
+                            {item.label}
                           </div>
-                          <span className="text-xs text-gray-500">{planes.length} {t('menu_planeaciones')}</span>
+                          <span className="text-xs text-gray-500">{item.rows.length} {t('menu_planeaciones')}</span>
                         </div>
 
                         {expandedGroups[subKey] && (
@@ -316,7 +344,7 @@ function HistorialPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {planes.map((plan) => (
+                                  {item.rows.map((plan) => (
                                   <tr key={plan.id} className="border-b hover:bg-gray-50 transition">
                                     <td className="px-6 py-3 text-gray-800 font-medium">{plan.materia || plan.nombMateria}</td>
                                     <td className="px-6 py-3 text-gray-800">{plan.grupo}</td>
@@ -458,11 +486,25 @@ function HistorialPage() {
                               {t('action_ver')}
                             </button>
                             <button
+                              onClick={() => handleGoToReportes(plan)}
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 text-xs font-semibold hover:bg-emerald-100 transition"
+                            >
+                              <span className="material-symbols-outlined text-sm">assignment</span>
+                              {t('action_reportes')}
+                            </button>
+                            <button
                               onClick={() => handleVerEditar(plan)}
                               className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 text-xs font-semibold hover:bg-indigo-100 transition"
                             >
                               <span className="material-symbols-outlined text-sm">edit</span>
                               {t('action_editar')}
+                            </button>
+                            <button
+                              onClick={() => handleGoToReportes(plan)}
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 text-xs font-semibold hover:bg-emerald-100 transition"
+                            >
+                              <span className="material-symbols-outlined text-sm">assignment</span>
+                              {t('action_reportes')}
                             </button>
                             {showArchived ? (
                               <>

@@ -28,7 +28,7 @@ function DashboardPage({ onLogout }) {
 
         {/* Content Area */}
         <main className="flex-1 overflow-auto p-4 md:p-8">
-          <MainContent currentPage={currentPage} />
+          <MainContent currentPage={currentPage} onPageChange={setCurrentPage} />
         </main>
       </div>
     </div>

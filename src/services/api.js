@@ -88,6 +88,20 @@ export const planningService = {
     }),
 };
 
+// === SPECIALTIES ENDPOINTS ===
+export const specialtiesService = {
+  getAll: () => apiCall('/specialties'),
+  add: (carrera, especialidad) =>
+    apiCall('/specialties', {
+      method: 'POST',
+      body: JSON.stringify({ carrera, especialidad }),
+    }),
+  remove: (carrera, especialidad) =>
+    apiCall(`/specialties?carrera=${encodeURIComponent(carrera)}&especialidad=${encodeURIComponent(especialidad)}`, {
+      method: 'DELETE',
+    }),
+};
+
 // === UTILITY ===
 export const setToken = (token) => {
   localStorage.setItem('token', token);
