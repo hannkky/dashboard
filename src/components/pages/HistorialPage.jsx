@@ -308,11 +308,16 @@ function HistorialPage({ onPageChange }) {
         {groupBy === 'carrera' && Object.keys(groupedByCarreraEspecialidad).length > 0 ? (
           Object.entries(groupedByCarreraEspecialidad).map(([carreraKey, data]) => (
             <div key={carreraKey} className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-3 cursor-pointer" onClick={() => setExpandedGroups(prev => ({ ...prev, [carreraKey]: !prev[carreraKey] }))}>
+              <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-3 cursor-pointer flex items-center justify-between" onClick={() => setExpandedGroups(prev => ({ ...prev, [carreraKey]: !prev[carreraKey] }))}>
                 <h3 className="text-white font-bold text-lg flex items-center gap-2">
                   <span className="material-symbols-outlined text-lg">school</span>
                   {data.label}
                 </h3>
+                <button
+                  className="bg-white/20 hover:bg-white/30 text-white font-bold py-1 px-2 rounded-full transition"
+                >
+                  <span className="material-symbols-outlined text-base">{expandedGroups[carreraKey] ? 'remove' : 'add'}</span>
+                </button>
               </div>
 
               {expandedGroups[carreraKey] && (

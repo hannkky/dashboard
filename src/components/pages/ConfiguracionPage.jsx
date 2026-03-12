@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { setLang, t, getLang, notifyLangChange } from '../../i18n';
+import { getLang, notifyLangChange, setLang, t } from '../../i18n';
 import Popup from '../ui/Popup';
 
 function ConfiguracionPage() {
@@ -19,7 +19,7 @@ function ConfiguracionPage() {
     { id: 2, usuario: 'docente1', email: 'docente1@uttn.edu.mx', rol: 'Docente', estado: 'Activo' },
     { id: 3, usuario: 'docente2', email: 'docente2@uttn.edu.mx', rol: 'Docente', estado: 'Inactivo' },
   ]);
-  const [newUser, setNewUser] = useState({ usuario: '', email: '', rol: 'Docente' });
+  const [newUser, setNewUser] = useState({ usuario: '', email: '', rol: 'Usuario' });
   const [popup, setPopup] = useState({ open: false, title: '', message: '', variant: 'info', onConfirm: null });
   const [isApplyingLang, setIsApplyingLang] = useState(false);
 
@@ -76,6 +76,17 @@ function ConfiguracionPage() {
     setUsers(users.map(u => u.id === id ? { ...u, estado: u.estado === 'Activo' ? 'Inactivo' : 'Activo' } : u));
   };
 
+  const changeUserRole = (id) => {
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+    const newRole = user.rol === 'Administrador' ? 'Usuario' : 'Administrador';
+    setUsers(users.map(u => u.id === id ? { ...u, rol: newRole } : u));
+    openPopup({ 
+      title: 'Rol actualizado', 
+      message: `El usuario ${user.usuario} ahora es ${newRole}.` 
+    });
+  };
+
   const removeUser = (id) => {
     openPopup({
       title: t('user_delete'),
@@ -101,8 +112,8 @@ function ConfiguracionPage() {
       estado: 'Activo'
     };
     setUsers([entry, ...users]);
-    setNewUser({ usuario: '', email: '', rol: 'Docente' });
-    openPopup({ title: 'Usuario agregado', message: `Se agregó ${entry.usuario}.` });
+    setNewUser({ usuario: '', email: '', rol: 'Usuario' });
+    openPopup({ title: 'Usuario agregado', message: `Se agregó ${entry.usuario} como ${entry.rol}.` });
   };
 
   return (
@@ -268,7 +279,7 @@ function ConfiguracionPage() {
                 onChange={(e) => setNewUser({ ...newUser, rol: e.target.value })}
                 className="border border-gray-300 rounded-lg px-3 py-2"
               >
-                <option value="Docente">Docente</option>
+                <option value="Usuario">Usuario</option>
                 <option value="Administrador">Administrador</option>
               </select>
               <button
@@ -310,16 +321,23 @@ function ConfiguracionPage() {
                           {user.estado}
                         </span>
                       </td>
-                      <td className="px-4 py-3 flex gap-2">
+                      <td className="px-4 py-3 flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => changeUserRole(user.id)}
+                          className="text-blue-500 hover:text-blue-700 text-sm"
+                          title="Cambiar rol"
+                        >
+                          {user.rol === 'Administrador' || user.rol === 'Usuario' ? 'Cambiar rol' : '-'}
+                        </button>
                         <button
                           onClick={() => toggleUserStatus(user.id)}
-                          className="text-teal-500 hover:text-teal-700"
+                          className="text-teal-500 hover:text-teal-700 text-sm"
                         >
                           {user.estado === 'Activo' ? t('user_deactivate') : t('user_activate')}
                         </button>
                         <button
                           onClick={() => removeUser(user.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-red-500 hover:text-red-700 text-sm"
                         >
                           {t('user_delete')}
                         </button>

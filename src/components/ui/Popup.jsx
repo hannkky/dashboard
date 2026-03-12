@@ -1,6 +1,6 @@
 ﻿import { t } from '../../i18n';
 
-function Popup({ open, title, message, variant = 'info', confirmText, cancelText, onConfirm, onCancel, extraActions = [] }) {
+function Popup({ open, title, message, variant = 'info', confirmText, cancelText, onConfirm, onCancel, extraActions = [], showContinueAnyway = false, onContinueAnyway }) {
   if (!open) return null;
 
   return (
@@ -16,6 +16,14 @@ function Popup({ open, title, message, variant = 'info', confirmText, cancelText
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3 justify-end">
+          {showContinueAnyway && (
+            <button
+              onClick={onContinueAnyway}
+              className="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600"
+            >
+              Continuar de todos modos
+            </button>
+          )}
           {Array.isArray(extraActions) && extraActions.map((action, idx) => (
             <button
               key={idx}

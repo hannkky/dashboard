@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { t } from '../i18n';
 import Popup from '../components/ui/Popup';
+import { t } from '../i18n';
 
 function LoginPage({ onLogin }) {
   const [usuario, setUsuario] = useState('');
@@ -20,18 +20,27 @@ function LoginPage({ onLogin }) {
       openPopup('Datos incompletos', 'Ingresa usuario y contraseña.');
       return;
     }
+    // Check registered users first
     try {
       const rawUsers = localStorage.getItem('registeredUsers');
       const users = rawUsers ? JSON.parse(rawUsers) : [];
       if (users.length > 0) {
         const match = users.find(u => u.usuario === usuario.trim() && u.contrasena === contrasena);
-        if (!match) {
-          openPopup('Acceso no válido', t('login_invalid'));
+        if (match) {
+          // Use role from registered user, default to 'usuario'
+          const role = match.rol || 'usuario';
+          try {
+            localStorage.setItem('role', role);
+            localStorage.setItem('usuario', usuario.trim());
+          } catch (e) {}
+          onLogin();
           return;
         }
       }
     } catch (e) {}
-    const role = usuario.trim().toLowerCase() === 'admin' ? 'admin' : 'user';
+    
+    // Fallback for old accounts or hardcoded users
+    const role = usuario.trim().toLowerCase() === 'admin' ? 'admin' : 'usuario';
     try {
       localStorage.setItem('role', role);
       localStorage.setItem('usuario', usuario.trim());
@@ -52,7 +61,8 @@ function LoginPage({ onLogin }) {
         openPopup('Usuario existente', t('register_exists'));
         return;
       }
-      users.push({ usuario: regUsuario.trim(), email: regEmail.trim(), contrasena: regContrasena });
+      // New users are "usuario" by default, not admin
+      users.push({ usuario: regUsuario.trim(), email: regEmail.trim(), contrasena: regContrasena, rol: 'usuario' });
       localStorage.setItem('registeredUsers', JSON.stringify(users));
     } catch (e) {}
     setRegUsuario('');
@@ -63,7 +73,7 @@ function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[rgb(20,184,166)] flex items-center justify-center px-4">
       <Popup
         open={popup.open}
         title={popup.title}
@@ -133,7 +143,7 @@ function LoginPage({ onLogin }) {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gray-900 hover:bg-black text-white font-semibold py-3 rounded-xl transition"
+                className="w-full bg-[rgb(20,184,166)] hover:bg-[rgb(15,158,144)] text-white font-semibold py-3 rounded-xl transition"
               >
                 {t('register_button')}
               </button>
@@ -173,7 +183,7 @@ function LoginPage({ onLogin }) {
               </div>
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition"
+                className="w-full bg-[rgb(20,184,166)] hover:bg-[rgb(15,158,144)] text-white font-bold py-3 rounded-xl transition"
               >
                 {t('login_button')}
               </button>

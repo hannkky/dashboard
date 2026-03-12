@@ -1,8 +1,8 @@
-﻿import { Fragment, useEffect, useMemo, useState } from 'react';
+﻿import ExcelJS from 'exceljs';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { t } from '../../i18n';
-import ExcelJS from 'exceljs';
-import Popup from '../ui/Popup';
 import { specialtiesService } from '../../services/api';
+import Popup from '../ui/Popup';
 
 function ReportesPage() {
   const [planeaciones, setPlaneaciones] = useState([]);
@@ -87,6 +87,27 @@ function ReportesPage() {
         setActiveEspecialidad(parsed.filters?.especialidad || parsed.especialidad || '');
         setActiveGrupo(parsed.filters?.grupo || '');
         localStorage.removeItem('reportesPrefill');
+      }
+    } catch (e) {}
+
+    // Cargar últimos valores usados para facilitar llenado
+    try {
+      const rawLastUsed = localStorage.getItem('reportesLastUsed');
+      if (rawLastUsed) {
+        const lastUsed = JSON.parse(rawLastUsed);
+        // Solo usar como fallback si no hay otros valores
+        if (!exportMeta.carrera && lastUsed.carrera) {
+          setExportMeta(prev => ({ ...prev, carrera: lastUsed.carrera }));
+        }
+        if (!exportMeta.especialidad && lastUsed.especialidad) {
+          setExportMeta(prev => ({ ...prev, especialidad: lastUsed.especialidad }));
+        }
+        if (!exportMeta.cuatrimestre && lastUsed.cuatrimestre) {
+          setExportMeta(prev => ({ ...prev, cuatrimestre: lastUsed.cuatrimestre }));
+        }
+        if (!exportMeta.turno && lastUsed.turno) {
+          setExportMeta(prev => ({ ...prev, turno: lastUsed.turno }));
+        }
       }
     } catch (e) {}
   }, []);
@@ -407,6 +428,17 @@ function ReportesPage() {
       rows: selectedRows
     };
     setHistory([entry, ...history]);
+
+    // Guardar últimos valores usados para facilitar下一次 llenado
+    try {
+      localStorage.setItem('reportesLastUsed', JSON.stringify({
+        carrera: exportMeta.carrera,
+        especialidad: exportMeta.especialidad,
+        cuatrimestre: exportMeta.cuatrimestre,
+        turno: exportMeta.turno,
+        fechaElaboracion: exportMeta.fechaElaboracion
+      }));
+    } catch (e) {}
   };
 
   const handleOpenExport = () => {
