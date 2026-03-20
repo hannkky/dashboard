@@ -3,22 +3,19 @@ import { verifyToken } from '../controllers/authController.js';
 export const auth = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Token no proporcionado' });
     }
 
     const token = authHeader.split(' ')[1];
-    const session = verifyToken(token);
-
-    if (!session) {
-      return res.status(401).json({ error: 'Token inválido' });
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ error: 'Token invalido' });
     }
 
-    // Adjuntar usuario al request
-    req.user = session;
+    req.user = payload;
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Error de autenticación' });
+    res.status(401).json({ error: 'Error de autenticacion' });
   }
 };

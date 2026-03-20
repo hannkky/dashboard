@@ -4,6 +4,8 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import planningRoutes from './routes/planning.js';
 import specialtiesRoutes from './routes/specialties.js';
+import usersRoutes from './routes/users.js';
+import { getPool } from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,10 +25,21 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/planning', planningRoutes);
 app.use('/api/specialties', specialtiesRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/db-health', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request().query('SELECT 1 AS ok');
+    res.json({ ok: result?.recordset?.[0]?.ok === 1 });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
 });
 
 // 404 handler
@@ -39,8 +52,9 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`✅ Servidor ejecutándose en http://localhost:${PORT}`);
-  console.log(`📝 API Health: http://localhost:${PORT}/api/health`);
+  console.log(`Servidor ejecutandose en http://localhost:${PORT}`);
+  console.log(`API Health: http://localhost:${PORT}/api/health`);
 });
 
 export default app;
+

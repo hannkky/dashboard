@@ -2,8 +2,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Helper para manejo de errores
 const handleError = (error) => {
-  console.error('API Error:', error);
-  throw error;
+  console.error('API error:', error);
 };
 
 // Helper para requests
@@ -35,6 +34,7 @@ const apiCall = async (endpoint, options = {}) => {
     return data;
   } catch (error) {
     handleError(error);
+    throw error;
   }
 };
 
@@ -44,6 +44,17 @@ export const authService = {
     apiCall('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ usuario, contrasena }),
+    }),
+
+  register: (usuario, nombreCompleto, contrasena) =>
+    apiCall('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ usuario, nombreCompleto, contrasena }),
+    }),
+
+  me: () =>
+    apiCall('/auth/me', {
+      method: 'GET',
     }),
 
   logout: () =>
@@ -99,6 +110,36 @@ export const specialtiesService = {
   remove: (carrera, especialidad) =>
     apiCall(`/specialties?carrera=${encodeURIComponent(carrera)}&especialidad=${encodeURIComponent(especialidad)}`, {
       method: 'DELETE',
+    }),
+};
+
+// === USERS ENDPOINTS ===
+export const usersService = {
+  getAll: () => apiCall('/users'),
+  create: (data) =>
+    apiCall('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateRole: (id, rol) =>
+    apiCall(`/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rol }),
+    }),
+  updateStatus: (id, activo) =>
+    apiCall(`/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ activo }),
+    }),
+  updatePassword: (id, contrasena) =>
+    apiCall(`/users/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ contrasena }),
+    }),
+  updateMyPassword: (contrasenaActual, contrasenaNueva) =>
+    apiCall('/users/me/password', {
+      method: 'PUT',
+      body: JSON.stringify({ contrasenaActual, contrasenaNueva }),
     }),
 };
 

@@ -7,11 +7,12 @@ import {
     updatePlanning,
     uploadFile,
 } from "../controllers/planningController.js";
+import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Todos los endpoints protegidos con auth
-// router.use(auth);
+router.use(auth);
 
 // GET /api/planning - Obtener todas las planeaciones
 router.get("/", getAllPlannings);

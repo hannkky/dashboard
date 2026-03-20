@@ -1,75 +1,64 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import Popup from '../components/ui/Popup';
 import { t } from '../i18n';
+import { authService } from '../services/api';
 
 function LoginPage({ onLogin }) {
   const [usuario, setUsuario] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const [showRegister, setShowRegister] = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
   const [regUsuario, setRegUsuario] = useState('');
-  const [regEmail, setRegEmail] = useState('');
+  const [regNombre, setRegNombre] = useState('');
   const [regContrasena, setRegContrasena] = useState('');
+  const [loading, setLoading] = useState(false);
   const [popup, setPopup] = useState({ open: false, title: '', message: '' });
 
   const openPopup = (title, message) => setPopup({ open: true, title, message });
   const closePopup = () => setPopup((prev) => ({ ...prev, open: false }));
 
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!usuario || !contrasena) {
       openPopup('Datos incompletos', 'Ingresa usuario y contraseña.');
       return;
     }
-    // Check registered users first
+    setLoading(true);
     try {
-      const rawUsers = localStorage.getItem('registeredUsers');
-      const users = rawUsers ? JSON.parse(rawUsers) : [];
-      if (users.length > 0) {
-        const match = users.find(u => u.usuario === usuario.trim() && u.contrasena === contrasena);
-        if (match) {
-          // Use role from registered user, default to 'usuario'
-          const role = match.rol || 'usuario';
-          try {
-            localStorage.setItem('role', role);
-            localStorage.setItem('usuario', usuario.trim());
-          } catch (e) {}
-          onLogin();
-          return;
-        }
+      const res = await authService.login(usuario, contrasena);
+      if (res.success) {
+        localStorage.setItem('token', res.token);
+        localStorage.setItem('role', res.user.rol);
+        localStorage.setItem('usuario', res.user.usuario);
+        onLogin();
       }
-    } catch (e) {}
-    
-    // Fallback for old accounts or hardcoded users
-    const role = usuario.trim().toLowerCase() === 'admin' ? 'admin' : 'usuario';
-    try {
-      localStorage.setItem('role', role);
-      localStorage.setItem('usuario', usuario.trim());
-    } catch (e) {}
-    onLogin();
+    } catch (error) {
+      const message = error?.message || 'No se pudo iniciar sesión.';
+      openPopup('Error', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    if (!regUsuario || !regEmail || !regContrasena) {
-      openPopup('Datos incompletos', 'Completa usuario, correo y contraseña.');
+    if (!regUsuario || !regNombre || !regContrasena) {
+      openPopup('Datos incompletos', 'Completa todos los campos.');
       return;
     }
+    setLoading(true);
     try {
-      const rawUsers = localStorage.getItem('registeredUsers');
-      const users = rawUsers ? JSON.parse(rawUsers) : [];
-      if (users.some(u => u.usuario === regUsuario.trim())) {
-        openPopup('Usuario existente', t('register_exists'));
-        return;
-      }
-      // New users are "usuario" by default, not admin
-      users.push({ usuario: regUsuario.trim(), email: regEmail.trim(), contrasena: regContrasena, rol: 'usuario' });
-      localStorage.setItem('registeredUsers', JSON.stringify(users));
-    } catch (e) {}
-    setRegUsuario('');
-    setRegEmail('');
-    setRegContrasena('');
-    setShowRegister(false);
-    openPopup('Registro exitoso', t('register_success'));
+      await authService.register(regUsuario, regNombre, regContrasena);
+      setRegUsuario('');
+      setRegNombre('');
+      setRegContrasena('');
+      setShowRegister(false);
+      openPopup('Registro exitoso', 'Puedes iniciar sesión ahora.');
+    } catch (error) {
+      const message = error?.message || 'No se pudo registrar.';
+      openPopup('Error', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -113,22 +102,29 @@ function LoginPage({ onLogin }) {
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">{t('register_user')}</label>
+
                 <input
                   type="text"
+                  inputMode="text"
+                  lang="es"
+                  pattern="[a-zA-Z0-9ñÑáéíóúÁÉÍÓÚüÜ ]*"
                   value={regUsuario}
                   onChange={(e) => setRegUsuario(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   placeholder="Usuario"
+                  disabled={loading}
                 />
+
               </div>
               <div>
-                <label className="block text-gray-700 text-sm font-medium mb-1">{t('register_email')}</label>
+                <label className="block text-gray-700 text-sm font-medium mb-1">Nombre completo</label>
                 <input
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
+                  type="text"
+                  value={regNombre}
+                  onChange={(e) => setRegNombre(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  placeholder="Correo"
+                  placeholder="Nombre completo"
+                  disabled={loading}
                 />
               </div>
               <div>
@@ -139,13 +135,15 @@ function LoginPage({ onLogin }) {
                   onChange={(e) => setRegContrasena(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   placeholder="Contraseña"
+                  disabled={loading}
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-[rgb(20,184,166)] hover:bg-[rgb(15,158,144)] text-white font-semibold py-3 rounded-xl transition"
+                disabled={loading}
+                className="w-full bg-[rgb(20,184,166)] hover:bg-[rgb(15,158,144)] text-white font-semibold py-3 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('register_button')}
+                {loading ? 'Registrando...' : t('register_button')}
               </button>
               <button
                 type="button"
@@ -156,18 +154,24 @@ function LoginPage({ onLogin }) {
               </button>
             </form>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-5">
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">
                   {t('login_user')}
                 </label>
+
                 <input
                   type="text"
+                  inputMode="text"
+                  lang="es"
+                  pattern="[a-zA-Z0-9ñÑáéíóúÁÉÍÓÚüÜ ]*"
                   value={usuario}
                   onChange={(e) => setUsuario(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   placeholder="Usuario"
+                  disabled={loading}
                 />
+
               </div>
               <div>
                 <label className="block text-gray-700 text-sm font-medium mb-1">
@@ -179,13 +183,15 @@ function LoginPage({ onLogin }) {
                   onChange={(e) => setContrasena(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   placeholder="Contraseña"
+                  disabled={loading}
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-[rgb(20,184,166)] hover:bg-[rgb(15,158,144)] text-white font-bold py-3 rounded-xl transition"
+                disabled={loading}
+                className="w-full bg-[rgb(20,184,166)] hover:bg-[rgb(15,158,144)] text-white font-bold py-3 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('login_button')}
+                {loading ? 'Iniciando sesión...' : t('login_button')}
               </button>
               <button
                 type="button"

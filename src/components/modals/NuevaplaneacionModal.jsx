@@ -15,10 +15,11 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [specialtiesByCareer, setSpecialtiesByCareer] = useState({});
   const [newSpecialty, setNewSpecialty] = useState('');
-  const [formPopup, setFormPopup] = useState({ open: false, title: '', message: '', showContinueAnyway: false });
+  const [formPopup, setFormPopup] = useState({ open: false, title: '', message: '', showContinueAnyway: false, context: '' });
   const [pendingData, setPendingData] = useState(null);
+  const [pendingSubmitEstado, setPendingSubmitEstado] = useState(null);
 
-  const openFormPopup = (title, message, showContinueAnyway = false) => setFormPopup({ open: true, title, message, showContinueAnyway });
+  const openFormPopup = (title, message, showContinueAnyway = false, context = '') => setFormPopup({ open: true, title, message, showContinueAnyway, context });
   const closeFormPopup = () => setFormPopup((prev) => ({ ...prev, open: false }));
 
   const handleFileChange = (e) => {
@@ -183,7 +184,7 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
         setEditedData(data);
         setShowPreview(true);
       } catch (error) {
-        console.error('Error extrayendo documento:', error);
+
         const detail = error?.message ? ` Detalle: ${error.message}` : '';
         openFormPopup('Error al procesar', `Verifica que el archivo no esté protegido ni dañado.${detail}`);
       } finally {
@@ -214,50 +215,8 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
     setEditedData({ ...editedData, unidades: next.length ? next : [{ titulo: '', fechaPlaneada: '', fechaReal: '', fechaEvalPlaneada: '', fechaEvalReal: '' }] });
   };
 
-  const handleSave = (estado) => {
+  const finalizeSave = (estado) => {
     if (editedData) {
-      if (estado !== 'Borrador') {
-        const requiredFields = [
-          { key: 'carrera', label: t('modal_carrera') },
-          { key: 'especialidad', label: t('modal_especialidad') },
-          { key: 'grado', label: t('modal_grado') },
-          { key: 'grupo', label: t('modal_grupo') },
-          { key: 'nombMateria', label: t('modal_materia') },
-          { key: 'cuatrimestre', label: t('cuatrimestre') },
-          { key: 'horasTotales', label: t('modal_horas') },
-          { key: 'docente', label: t('modal_docente') },
-          { key: 'fechaElaboracion', label: t('fecha_elaboracion') },
-        ];
-        const missing = requiredFields
-          .filter(item => !String(editedData[item.key] || '').trim())
-          .map(item => `• ${item.label}`);
-
-        const unitIssues = [];
-        (editedData.unidades || []).forEach((u, idx) => {
-          const prefix = `• Unidad ${idx + 1}`;
-          if (!String(u.titulo || '').trim()) unitIssues.push(`${prefix}: sin título`);
-          if (!String(u.fechaPlaneada || '').trim()) unitIssues.push(`${prefix}: falta fecha planeada`);
-          if (!String(u.fechaReal || '').trim()) unitIssues.push(`${prefix}: falta fecha real`);
-          if (!String(u.fechaEvalPlaneada || '').trim()) unitIssues.push(`${prefix}: falta fecha evaluación planeada`);
-          if (!String(u.fechaEvalReal || '').trim()) unitIssues.push(`${prefix}: falta fecha evaluación real`);
-          if (u.fechaPlaneada && !isValidDateRange(u.fechaPlaneada)) unitIssues.push(`${prefix}: fecha planeada inválida`);
-          if (u.fechaReal && !isValidDateRange(u.fechaReal)) unitIssues.push(`${prefix}: fecha real inválida`);
-          if (u.fechaEvalPlaneada && !isValidDateRange(u.fechaEvalPlaneada)) unitIssues.push(`${prefix}: fecha evaluación planeada inválida`);
-          if (u.fechaEvalReal && !isValidDateRange(u.fechaEvalReal)) unitIssues.push(`${prefix}: fecha evaluación real inválida`);
-        });
-
-        if (missing.length > 0 || unitIssues.length > 0) {
-          const message = [
-            missing.length ? 'Campos obligatorios:' : '',
-            ...missing,
-            unitIssues.length ? '\nUnidades:' : '',
-            ...unitIssues
-          ].filter(Boolean).join('\n');
-          openFormPopup('Revisa la información', message);
-          return;
-        }
-      }
-
       const normalizedUnits = (editedData.unidades || []).map(u => ({
         ...u,
         fechaPlaneada: normalizeDateRange(u.fechaPlaneada || ''),
@@ -280,6 +239,54 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
       });
       resetModal();
     }
+  };
+
+  const handleSave = (estado, options = {}) => {
+    if (!editedData) return;
+    if (estado !== 'Borrador' && !options.skipValidation) {
+      const requiredFields = [
+        { key: 'carrera', label: t('modal_carrera') },
+        { key: 'especialidad', label: t('modal_especialidad') },
+        { key: 'grado', label: t('modal_grado') },
+        { key: 'grupo', label: t('modal_grupo') },
+        { key: 'nombMateria', label: t('modal_materia') },
+        { key: 'cuatrimestre', label: t('cuatrimestre') },
+        { key: 'horasTotales', label: t('modal_horas') },
+        { key: 'docente', label: t('modal_docente') },
+        { key: 'fechaElaboracion', label: t('fecha_elaboracion') },
+      ];
+      const missing = requiredFields
+        .filter(item => !String(editedData[item.key] || '').trim())
+        .map(item => `- ${item.label}`);
+
+      const unitIssues = [];
+      (editedData.unidades || []).forEach((u, idx) => {
+        const prefix = `- Unidad ${idx + 1}`;
+        if (!String(u.titulo || '').trim()) unitIssues.push(`${prefix}: sin título`);
+        if (!String(u.fechaPlaneada || '').trim()) unitIssues.push(`${prefix}: falta fecha planeada`);
+        if (!String(u.fechaReal || '').trim()) unitIssues.push(`${prefix}: falta fecha real`);
+        if (!String(u.fechaEvalPlaneada || '').trim()) unitIssues.push(`${prefix}: falta fecha evaluación planeada`);
+        if (!String(u.fechaEvalReal || '').trim()) unitIssues.push(`${prefix}: falta fecha evaluación real`);
+        if (u.fechaPlaneada && !isValidDateRange(u.fechaPlaneada)) unitIssues.push(`${prefix}: fecha planeada inválida`);
+        if (u.fechaReal && !isValidDateRange(u.fechaReal)) unitIssues.push(`${prefix}: fecha real inválida`);
+        if (u.fechaEvalPlaneada && !isValidDateRange(u.fechaEvalPlaneada)) unitIssues.push(`${prefix}: fecha evaluación planeada inválida`);
+        if (u.fechaEvalReal && !isValidDateRange(u.fechaEvalReal)) unitIssues.push(`${prefix}: fecha evaluación real inválida`);
+      });
+
+      if (missing.length > 0 || unitIssues.length > 0) {
+        const message = [
+          missing.length ? 'Campos obligatorios:' : '',
+          ...missing,
+          unitIssues.length ? '\nUnidades:' : '',
+          ...unitIssues
+        ].filter(Boolean).join('\n');
+        setPendingSubmitEstado(estado);
+        openFormPopup('Revisa la información', message, true, 'validation');
+        return;
+      }
+    }
+
+    finalizeSave(estado);
   };
 
   const resetModal = () => {
@@ -609,11 +616,21 @@ function NuevaPlaneacionModal({ isOpen, onClose, onSave }) {
           title={formPopup.title}
           message={formPopup.message}
           showContinueAnyway={formPopup.showContinueAnyway}
+          confirmText={formPopup.showContinueAnyway ? 'Cancelar' : undefined}
           onContinueAnyway={() => {
             if (pendingData) {
               setEditedData(pendingData);
               setShowPreview(true);
               setPendingData(null);
+              closeFormPopup();
+              return;
+            }
+            if (pendingSubmitEstado) {
+              const estado = pendingSubmitEstado;
+              setPendingSubmitEstado(null);
+              closeFormPopup();
+              handleSave(estado, { skipValidation: true });
+              return;
             }
             closeFormPopup();
           }}

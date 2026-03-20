@@ -1,34 +1,21 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { t } from '../../i18n';
+import { planningService } from '../../services/api';
 import NuevaPlaneacionModal from '../modals/NuevaplaneacionModal';
 import VerEditarPlaneacionModal from '../modals/VerEditarPlaneacionModal';
-import { t } from '../../i18n';
 import Popup from '../ui/Popup';
 
 function HistorialPage({ onPageChange }) {
   const initialPlanes = () => {
     try {
-      const raw = localStorage.getItem('planeaciones');
+      const usuario = localStorage.getItem('usuario') || '';
+      const key = usuario ? `planeaciones_${usuario}` : 'planeaciones';
+      const raw = localStorage.getItem(key);
       if (raw) return JSON.parse(raw);
     } catch (e) {
       console.warn('Error parsing planeaciones from localStorage', e);
     }
-    return [
-      {
-        id: 1,
-        docente: 'Dr. Juan Pérez López',
-        materia: 'Programación II',
-        grupo: 'A1',
-        periodo: '2025-1',
-        fechaInicio: '2025-02-01',
-        fechaFin: '2025-05-01',
-        estado: 'Completado',
-        carrera: 'Ingeniería en Sistemas',
-        especialidad: 'Desarrollo de Software',
-        grado: '3°',
-        horasTotales: '60',
-        isArchived: false,
-      },
-    ];
+    return [];
   };
 
   const [planeaciones, setPlaneaciones] = useState(initialPlanes);
@@ -43,6 +30,29 @@ function HistorialPage({ onPageChange }) {
   const [popup, setPopup] = useState({ open: false, title: '', message: '', variant: 'info', onConfirm: null });
 
   useEffect(() => {
+    let mounted = true;
+    const loadFromApi = async () => {
+      try {
+        const res = await planningService.getAll();
+        if (mounted && res?.data) {
+          setPlaneaciones(res.data);
+          return;
+        }
+      } catch (e) {}
+      try {
+        const token = localStorage.getItem('token');
+        if (token) return;
+        const usuario = localStorage.getItem('usuario') || '';
+        const key = usuario ? `planeaciones_${usuario}` : 'planeaciones';
+        const raw = localStorage.getItem(key);
+        if (mounted && raw) setPlaneaciones(JSON.parse(raw));
+      } catch (e) {}
+    };
+    loadFromApi();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
     setPlaneaciones(prevPlans => {
       const updated = prevPlans.map(plan => {
         if (!plan.isArchived && plan.fechaFin) {
@@ -55,13 +65,21 @@ function HistorialPage({ onPageChange }) {
         }
         return plan;
       });
-      try { localStorage.setItem('planeaciones', JSON.stringify(updated)); } catch (e) {}
+      try {
+        const usuario = localStorage.getItem('usuario') || '';
+        const key = usuario ? `planeaciones_${usuario}` : 'planeaciones';
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch (e) {}
       return updated;
     });
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem('planeaciones', JSON.stringify(planeaciones)); } catch (e) {}
+    try {
+      const usuario = localStorage.getItem('usuario') || '';
+      const key = usuario ? `planeaciones_${usuario}` : 'planeaciones';
+      localStorage.setItem(key, JSON.stringify(planeaciones));
+    } catch (e) {}
   }, [planeaciones]);
 
   const openPopup = (data) => setPopup({ open: true, ...data });
@@ -117,8 +135,21 @@ function HistorialPage({ onPageChange }) {
     return grouped;
   }, [filteredPlaneaciones]);
 
-  const handleSaveNewPlaneacion = (newData) => {
-    setPlaneaciones([...planeaciones, newData]);
+  const handleSaveNewPlaneacion = async (newData) => {
+    let savedData = { ...newData, id: Date.now() };
+    try {
+      const res = await planningService.create(savedData);
+      if (res?.data?.id) {
+        savedData.id = res.data.id;
+      }
+    } catch (e) {}
+    const updated = [...planeaciones, savedData];
+    try {
+      localStorage.setItem('planeaciones', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('LocalStorage save failed:', err);
+    }
+    setPlaneaciones(updated);
     setModalOpen(false);
   };
 
@@ -127,7 +158,10 @@ function HistorialPage({ onPageChange }) {
     setVerEditarOpen(true);
   };
 
-  const handleUpdatePlaneacion = (updatedData) => {
+  const handleUpdatePlaneacion = async (updatedData) => {
+    try {
+      await planningService.update(updatedData.id, updatedData);
+    } catch (e) {}
     setPlaneaciones(
       planeaciones.map(plan =>
         plan.id === updatedData.id ? updatedData : plan
@@ -140,21 +174,31 @@ function HistorialPage({ onPageChange }) {
   const handleDeletePlaneacion = (planId) => {
     openPopup({
       title: t('action_eliminar'),
-      message: '¿Eliminar planeación?',
+      message: '�Eliminar planeaci�n?',
       variant: 'confirm',
-      onConfirm: () => {
+      onConfirm: async () => {
+        try { await planningService.delete(planId); } catch (e) {}
         setPlaneaciones(planeaciones.filter(plan => plan.id !== planId));
         closePopup();
       }
     });
   };
 
-  const handleArchiveToggle = (planId) => {
-    setPlaneaciones(
-      planeaciones.map(plan =>
-        plan.id === planId ? { ...plan, isArchived: !plan.isArchived } : plan
-      )
-    );
+  const handleArchiveToggle = async (planId) => {
+    const updated = planeaciones.map(plan => {
+      if (plan.id !== planId) return plan;
+      const nextArchived = !plan.isArchived;
+      return {
+        ...plan,
+        isArchived: nextArchived,
+        archivedDate: nextArchived ? new Date().toISOString() : null
+      };
+    });
+    const target = updated.find(plan => plan.id === planId);
+    if (target) {
+      try { await planningService.update(planId, target); } catch (e) {}
+    }
+    setPlaneaciones(updated);
   };
 
   const handleGoToReportes = (plan) => {
@@ -258,47 +302,49 @@ function HistorialPage({ onPageChange }) {
             />
           </div>
 
-          <div className="min-w-[260px]">
-            <label className="block text-sm text-gray-600 mb-1">{t('historial_group_by')}</label>
-            <div className="flex flex-wrap gap-2">
-              {['carrera', 'grupo'].map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setGroupBy(opt)}
-                  className={`px-3 py-2 rounded-full text-sm font-semibold border transition ${
-                    groupBy === opt
-                      ? 'bg-teal-500 text-white border-teal-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {opt === 'carrera' && t('group_carrera')}
-                  {opt === 'grupo' && t('group_grupo')}
-                </button>
-              ))}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="min-w-[260px]">
+              <label className="block text-sm text-gray-600 mb-1">{t('historial_group_by')}</label>
+              <div className="flex flex-wrap gap-2">
+                {['carrera', 'grupo'].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setGroupBy(opt)}
+                    className={`px-3 py-2 rounded-full text-sm font-semibold border transition ${
+                      groupBy === opt
+                        ? 'bg-teal-500 text-white border-teal-500'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt === 'carrera' && t('group_carrera')}
+                    {opt === 'grupo' && t('group_grupo')}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="min-w-[260px]">
-            <label className="block text-sm text-gray-600 mb-1">{t('historial_status')}</label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'all', label: t('historial_status_all') },
-                { id: 'Completado', label: t('historial_status_completed') },
-                { id: 'Borrador', label: t('historial_status_draft') },
-                { id: 'En Proceso', label: t('historial_status_progress') },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setStatusFilter(opt.id)}
-                  className={`px-3 py-2 rounded-full text-sm font-semibold border transition ${
-                    statusFilter === opt.id
-                      ? 'bg-teal-500 text-white border-teal-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div className="min-w-[260px]">
+              <label className="block text-sm text-gray-600 mb-1">{t('historial_status')}</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'all', label: t('historial_status_all') },
+                  { id: 'Completado', label: t('historial_status_completed') },
+                  { id: 'Borrador', label: t('historial_status_draft') },
+                  { id: 'En Proceso', label: t('historial_status_progress') },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setStatusFilter(opt.id)}
+                    className={`px-3 py-2 rounded-full text-sm font-semibold border transition ${
+                      statusFilter === opt.id
+                        ? 'bg-teal-500 text-white border-teal-500'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -336,26 +382,27 @@ function HistorialPage({ onPageChange }) {
 
                         {expandedGroups[subKey] && (
                           <div className="p-4 overflow-x-auto">
-                            <table className="w-full min-w-[720px]">
+                            <table className="w-full table-auto">
                               <thead className="bg-gray-50 border-b">
                                 <tr>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_materia')}</th>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_grupo')}</th>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_grado')}</th>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_horas')}</th>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_fechas')}</th>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_estado')}</th>
-                                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">{t('table_acciones')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_materia')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_grupo')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_grado')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_horas')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_fechas')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_estado')}</th>
+                                  <th className="px-4 sm:px-6 py-3 text-left text-gray-700 font-semibold">{t('table_acciones')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                   {item.rows.map((plan) => (
+
                                   <tr key={plan.id} className="border-b hover:bg-gray-50 transition">
                                     <td className="px-6 py-3 text-gray-800 font-medium">{plan.materia || plan.nombMateria}</td>
                                     <td className="px-6 py-3 text-gray-800">{plan.grupo}</td>
                                     <td className="px-6 py-3 text-gray-800">{plan.grado}</td>
                                     <td className="px-6 py-3 text-gray-800">{plan.horasTotales}h</td>
-                                    <td className="px-6 py-3 text-gray-800 text-sm">{plan.fechaInicio} → {plan.fechaFin}</td>
+                                    <td className="px-6 py-3 text-gray-800 text-sm">{plan.fechaInicio} ? {plan.fechaFin}</td>
                                     <td className="px-6 py-3">
                                       <span
                                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -468,7 +515,7 @@ function HistorialPage({ onPageChange }) {
                           <td className="px-6 py-3 text-gray-800">{plan.grupo}</td>
                           <td className="px-6 py-3 text-gray-800">{plan.grado}</td>
                           <td className="px-6 py-3 text-gray-800">{plan.horasTotales}h</td>
-                          <td className="px-6 py-3 text-gray-800 text-sm">{plan.fechaInicio} → {plan.fechaFin}</td>
+                          <td className="px-6 py-3 text-gray-800 text-sm">{plan.fechaInicio} ? {plan.fechaFin}</td>
                           <td className="px-6 py-3">
                             <span
                               className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -573,32 +620,32 @@ function HistorialPage({ onPageChange }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-8">
-        <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-8">
+        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl shadow-xl ring-1 ring-gray-200">
           <h3 className="text-gray-600 text-sm font-semibold">
             {showArchived ? t('stats_total_archived') : t('stats_total')}
           </h3>
           <p className="text-3xl font-bold text-teal-600 mt-2">{statsSource.length}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl shadow-xl ring-1 ring-gray-200">
           <h3 className="text-gray-600 text-sm font-semibold">{t('stats_completadas')}</h3>
           <p className="text-3xl font-bold text-green-600 mt-2">
             {statsSource.filter(p => p.estado === 'Completado').length}
           </p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl shadow-xl ring-1 ring-gray-200">
           <h3 className="text-gray-600 text-sm font-semibold">{t('stats_borradores')}</h3>
           <p className="text-3xl font-bold text-amber-600 mt-2">
             {statsSource.filter(p => p.estado === 'Borrador').length}
           </p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl shadow-xl ring-1 ring-gray-200">
           <h3 className="text-gray-600 text-sm font-semibold">{t('stats_en_proceso')}</h3>
           <p className="text-3xl font-bold text-blue-600 mt-2">
             {statsSource.filter(p => p.estado === 'En Proceso').length}
           </p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl shadow-xl ring-1 ring-gray-200">
           <h3 className="text-gray-600 text-sm font-semibold">{t('stats_docentes')}</h3>
           <p className="text-3xl font-bold text-purple-600 mt-2">
             {groupCount}</p>
@@ -608,4 +655,6 @@ function HistorialPage({ onPageChange }) {
   );
 }
 
+
 export default HistorialPage;
+
