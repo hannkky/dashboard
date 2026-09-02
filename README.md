@@ -1,4 +1,3 @@
-
 # Academic Planning Dashboard
 
 <p>
@@ -14,11 +13,7 @@ Full-stack prototype for managing academic plans, reports and file uploads throu
 The project explores how an academic planning workflow could be centralized in a web application. It currently includes a React frontend, an Express API, simulated authentication and in-memory data management.
 
 <p align="center">
-  <img
-    src="./assets/images/dashboard-preview.png"
-    width="850"
-    alt="Academic Planning Dashboard preview"
-  >
+  <img src="./assets/images/dashboard-preview.png" width="850" alt="Academic Planning Dashboard preview">
 </p>
 
 ## Overview
@@ -80,14 +75,15 @@ academic-planning-dashboard/
 │   ├── app.js
 │   └── package.json
 ├── assets/
-│   └── dashboard-preview.png
+│   └── images/
+│       └── dashboard-preview.png
 ├── index.html
 ├── package.json
 ├── vite.config.js
 ├── tailwind.config.js
 ├── .env.example
 └── README.md
-````
+```
 
 ## Getting started
 
@@ -95,9 +91,9 @@ academic-planning-dashboard/
 
 Install the following software before running the project:
 
-* Node.js
-* npm
-* Git
+- Node.js
+- npm
+- Git
 
 ### Installation
 
@@ -176,10 +172,10 @@ For more detailed installation instructions, read [QUICK_START.md](./QUICK_START
 
 The following accounts are hard-coded for local demonstration purposes only:
 
-| Role          | Username  | Password     |
-| ------------- | --------- | ------------ |
-| Administrator | `admin`   | `admin123`   |
-| Teacher       | `docente` | `docente123` |
+| Role | Username | Password |
+|---|---|---|
+| Administrator | `admin` | `admin123` |
+| Teacher | `docente` | `docente123` |
 
 > These are not production credentials. Authentication is currently simulated and must not be used in a production environment.
 
@@ -187,69 +183,68 @@ The following accounts are hard-coded for local demonstration purposes only:
 
 ### Authentication
 
-| Method | Endpoint           | Description               |
-| ------ | ------------------ | ------------------------- |
-| POST   | `/api/auth/login`  | Start a simulated session |
-| POST   | `/api/auth/logout` | End the simulated session |
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/login` | Start a simulated session |
+| POST | `/api/auth/logout` | End the simulated session |
 
 ### Academic planning
 
-| Method | Endpoint               | Description                   |
-| ------ | ---------------------- | ----------------------------- |
-| GET    | `/api/planning`        | Retrieve all planning records |
-| GET    | `/api/planning/:id`    | Retrieve one planning record  |
-| POST   | `/api/planning`        | Create a planning record      |
-| PUT    | `/api/planning/:id`    | Update a planning record      |
-| DELETE | `/api/planning/:id`    | Delete a planning record      |
-| POST   | `/api/planning/upload` | Upload a planning file        |
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/planning` | Retrieve all planning records |
+| GET | `/api/planning/:id` | Retrieve one planning record |
+| POST | `/api/planning` | Create a planning record |
+| PUT | `/api/planning/:id` | Update a planning record |
+| DELETE | `/api/planning/:id` | Delete a planning record |
+| POST | `/api/planning/upload` | Upload a planning file |
 
 ## Current limitations
 
 This repository represents a prototype and is not production-ready.
 
-* Data is stored in memory and is lost when the server restarts
-* Authentication uses simulated session tokens
-* User passwords are not stored in a database
-* OCR processing is not implemented
-* Uploaded documents are not processed automatically
-* Automated tests are not currently included
-* Production deployment has not been configured
+- Data is stored in memory and is lost when the server restarts
+- Authentication uses simulated session tokens
+- User passwords are not stored in a database
+- OCR processing is not implemented
+- Uploaded documents are not processed automatically
+- Automated tests are not currently included
+- Production deployment has not been configured
 
 ## Roadmap
 
-* [ ] Add PostgreSQL or MySQL persistence
-* [ ] Implement secure authentication with hashed passwords
-* [ ] Add JWT validation and authorization
-* [ ] Process documents with OCR
-* [ ] Generate Excel reports
-* [ ] Add input validation
-* [ ] Add frontend and backend tests
-* [ ] Document the API with Swagger/OpenAPI
-* [ ] Create a Docker development environment
-* [ ] Add a CI/CD workflow
-* [ ] Deploy a public demonstration
+- [ ] Add PostgreSQL or MySQL persistence
+- [ ] Implement secure authentication with hashed passwords
+- [ ] Add JWT validation and authorization
+- [ ] Process documents with OCR
+- [ ] Generate Excel reports
+- [ ] Add input validation
+- [ ] Add frontend and backend tests
+- [ ] Document the API with Swagger/OpenAPI
+- [ ] Create a Docker development environment
+- [ ] Add a CI/CD workflow
+- [ ] Deploy a public demonstration
 
 ## What I learned
 
 This project helped me practice:
 
-* Structuring a React application with reusable components
-* Creating a responsive dashboard interface
-* Connecting a frontend to an Express API
-* Designing CRUD endpoints
-* Handling loading and error states
-* Separating frontend and backend responsibilities
-* Documenting current limitations and future improvements
+- Structuring a React application with reusable components
+- Creating a responsive dashboard interface
+- Connecting a frontend to an Express API
+- Designing CRUD endpoints
+- Handling loading and error states
+- Separating frontend and backend responsibilities
+- Documenting current limitations and future improvements
 
 ## Author
 
 **Carlos Constantino**
 
-* Portfolio: https://portafoliofrann.netlify.app/
-* LinkedIn: https://www.linkedin.com/in/fcoocarlos/
-* GitHub: https://github.com/frannnkkyy
+- Portfolio: [portafoliofrann.netlify.app](https://portafoliofrann.netlify.app/)
+- LinkedIn: [linkedin.com/in/fcoocarlos](https://www.linkedin.com/in/fcoocarlos/)
+- GitHub: [github.com/frannnkkyy](https://github.com/frannnkkyy)
 
 ## Project status
 
 This project is under active development and is intended for learning and portfolio demonstration.
-
