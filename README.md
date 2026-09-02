@@ -15,7 +15,7 @@ The project explores how an academic planning workflow could be centralized in a
 
 <p align="center">
   <img
-    src="./assets/dashboard-preview.png"
+    src="./assets/images/dashboard-preview.png"
     width="850"
     alt="Academic Planning Dashboard preview"
   >
